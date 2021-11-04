@@ -32,7 +32,7 @@ def getCloseData(ticker: str, startDate: str, endDate: str):
 def pullDataToDatabase(tickerList,start_date = "2021-01-01",end_date = "2021-10-20"):
     for ticker in tickerList:
         closeData = getCloseData(ticker, startDate=start_date, endDate=end_date)
-        print(type(closeData))
+        # print(type(closeData))
         db[ticker] = closeData.T.to_dict()
 ## TODO: remove nan data
 def getRawPriceFromDB(key: str):
@@ -103,11 +103,22 @@ def getReturnPort(port, weightArray):
   return exReturnPort
 
 def createRandomWeightDF(nameArray):
-  weights1 = np.random.default_rng().uniform(0,0.5,300).round(2)
-  weights2 = np.random.default_rng().uniform(0,0.5,300).round(2)
-  weights3 = []
-  for i in range(300):
-    weights3.append(1-weights1[i]-weights2[i])
+
+  weights1_1 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights2_1 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights3_1 = 1 - weights1_1 - weights2_1
+
+  weights1_2 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights3_2 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights2_2 = 1 - weights1_2 - weights3_2
+
+  weights2_3 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights3_3 = np.random.default_rng().uniform(0,0.5,100).round(2)
+  weights1_3 = 1 - weights2_3 - weights3_3
+  
+  weights1 = weights1_1 + weights1_2 + weights1_3
+  weights2 = weights2_1 + weights2_2 + weights2_3
+  weights3 = weights3_1 + weights3_2 + weights3_3
   return pd.DataFrame({nameArray[0]: weights1, nameArray[1]: weights2, nameArray[2]: weights3})
 
 def mergeDates(port, nameArray):
@@ -123,8 +134,8 @@ def mergeDates(port, nameArray):
     newObj[ticker] = newDF
   return newObj
 
-port = Port(tickerList)
-print(port)
+# port = Port(tickerList)
+# print(port)
 # for ticker in tickerList:
 #   print(newObj[ticker])
 
