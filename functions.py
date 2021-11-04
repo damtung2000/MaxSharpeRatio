@@ -116,9 +116,9 @@ def createRandomWeightDF(nameArray):
   weights3_3 = np.random.default_rng().uniform(0,0.5,100).round(2)
   weights1_3 = 1 - weights2_3 - weights3_3
   
-  weights1 = weights1_1 + weights1_2 + weights1_3
-  weights2 = weights2_1 + weights2_2 + weights2_3
-  weights3 = weights3_1 + weights3_2 + weights3_3
+  weights1 = [*weights1_1, *weights1_2, *weights1_3]
+  weights2 = [*weights2_1, *weights2_2, *weights2_3]
+  weights3 = [*weights3_1, *weights3_2, *weights3_3]
   return pd.DataFrame({nameArray[0]: weights1, nameArray[1]: weights2, nameArray[2]: weights3})
 
 def mergeDates(port, nameArray):

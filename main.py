@@ -46,8 +46,14 @@ def getBestPort(allTickers):
   answer = (input('Do you wanna save? (N/y)') or 'n')
   if answer == 'n':
     return
-  db[resultName] = resultDict[resultName].to_dict()
+  db[resultName] = resultDict[resultName].entry.to_dict()
 
 
 getBestPort(allTickers)
+
+# port = Port(["BTC-USD", "MSFT", "GME"])
+
+# for name in port.data.keys():
+#   port.data[name].to_csv('./{}.csv'.format(name))
+  
 
