@@ -5,19 +5,9 @@ import numpy as np
 from itertools import combinations
 import math
 
-tickerList = ['BTC-USD', 'DSI', 'TSLA']
-start_date = "2021-01-01"
-end_date = "2021-10-20"
-
-
-
-
-
-
-
-
-
-
+# tickerList = ['BTC-USD', 'DSI', 'TSLA']
+# start_date = "2021-01-01"
+# end_date = "2021-10-20"
 
 def getCloseData(ticker: str, startDate: str, endDate: str):
     data = yf.download(ticker, start=startDate, end=endDate)
@@ -29,7 +19,7 @@ def getCloseData(ticker: str, startDate: str, endDate: str):
     # print(adjCloseDF)
     return adjCloseDF
 
-def pullDataToDatabase(tickerList,start_date = "2021-01-01",end_date = "2021-10-20"):
+def pullDataToDatabase(tickerList,start_date ="2021-01-01",end_date ="2021-10-20"):
     for ticker in tickerList:
         closeData = getCloseData(ticker, startDate=start_date, endDate=end_date)
         # print(type(closeData))
@@ -41,11 +31,6 @@ def getRawPriceFromDB(key: str):
   df.index.name ='Date'
   df.reset_index(inplace=True)
   return df
-
-
-# tsla = getRawPriceFromDB('TSLA')
-# dsi = getRawPriceFromDB('DSI')
-# btc = getRawPriceFromDB('BTC-USD')
 
 def getReturnDaily(portData: dict):
   newData = {}
@@ -73,9 +58,11 @@ def tryToGetData(nameArray):
   return data
 
 class Port:
-  def __init__(self,nameArray):
+  def __init__(self, nameArray):
     self.name = nameArray
-    self.data = getReturnDaily(mergeDates(tryToGetData(nameArray), nameArray))
+    pastDataObj, realizedDataObj = mergeDates(tryToGetData(nameArray), nameArray)
+    self.pastData = getReturnDaily(pastDataObj)
+    self.realizedData = getReturnDaily(realizedDataObj)
     self.weightDF = createRandomWeightDF(nameArray)
   def __str__(self):
     return "{name}:\n {data}".format(name=self.name, data=self.data.values())
@@ -121,23 +108,30 @@ def createRandomWeightDF(nameArray):
   weights3 = [*weights3_1, *weights3_2, *weights3_3]
   return pd.DataFrame({nameArray[0]: weights1, nameArray[1]: weights2, nameArray[2]: weights3})
 
-def mergeDates(port, nameArray):
-  df1 = port[nameArray[0]]
-  df2 = port[nameArray[1]]
-  df3 = port[nameArray[2]]
+def mergeDates(portData, nameArray):
+  df1 = portData[nameArray[0]]
+  df2 = portData[nameArray[1]]
+  df3 = portData[nameArray[2]]
   merged = df1.merge(df2,on='Date').merge(df3,on='Date')
   merged.columns = ['Date', *nameArray]
-  newObj = {}
+  temp = merged.set_index('Date')
+  pastDataFrame = temp.loc[:'2021-08-01']
+  realizedDataFrame = temp.loc['2021-08-01':]
+  # print('pastData:\n{}'.format(pastDataFrame))
+  # print('realizedData:\n{}'.format(realizedDataFrame))
+  pastDataObj = {}
+  realizedDataObj = {}
   for ticker in nameArray:
-    newDF = merged.filter(['Date',ticker], axis=1)
-    newDF.columns = ['Date', 'Price']
-    newObj[ticker] = newDF
-  return newObj
+    # Past
+    newPastDF = pastDataFrame.filter([ticker], axis=1)
+    newPastDF.columns = ['Price']
+    pastDataObj[ticker] = newPastDF
 
-# port = Port(tickerList)
-# print(port)
-# for ticker in tickerList:
-#   print(newObj[ticker])
+    # Realized
+    newRealizedDF = realizedDataFrame.filter([ticker], axis=1)
+    newRealizedDF.columns = ['Price']
+    realizedDataObj[ticker] = newRealizedDF
+  return (pastDataObj, realizedDataObj)
 
 def calPart1(weight,sigma):
   return weight**2*sigma**2
@@ -174,31 +168,29 @@ def getAnnualizedSharpeRatio(port, weightArray, riskFreeRate=0.00025):
   return dailySharpeRatio * math.sqrt(252)
 
 def getStatsPort(port, weightArray, riskFreeRate=0.00025):
-  returnPort = getReturnPort(port,weightArray)
-  stdevPort = getStdevPort(port,weightArray)
-  dailySharpeRatio = (returnPort - riskFreeRate)/stdevPort
-  annualizedSharpeRatio = dailySharpeRatio * math.sqrt(252)
-  
-  return (returnPort, stdevPort, dailySharpeRatio, annualizedSharpeRatio)
+  annualizedSharpeRatio = getAnnualizedSharpeRatio(port,weightArray)
+  return annualizedSharpeRatio
 
 def getStatsDF(port, weightDF):
-  returnPortArray = []
-  stdevPortArray = []
-  dailySharpeRatioArray = [] 
-  annualizedSharpeRatioArray = []
+  bestSharpeRatio = 0
+  bestIndex = 0
+  # annualizedSharpeRatioArray = []
   for index, row in weightDF.iterrows():
     weightArray = row.tolist()
-    returnPort, stdevPort, dailySharpeRatio, annualizedSharpeRatio = getStatsPort(port,  weightArray)
-    returnPortArray.append(returnPort)
-    stdevPortArray.append(stdevPort)
-    dailySharpeRatioArray.append(dailySharpeRatio)
-    annualizedSharpeRatioArray.append(annualizedSharpeRatio)
+    annualizedSharpeRatio = getStatsPort(port,  weightArray)
+    # annualizedSharpeRatioArray.append(annualizedSharpeRatio)
+    if annualizedSharpeRatio > bestSharpeRatio:
+      bestSharpeRatio = annualizedSharpeRatio
+      bestIndex = index
+  print(bestIndex)
+  # print(weightDF)
   result = weightDF.copy()
-  result['ReturnPort'] = returnPortArray
-  result['StdevPort'] = stdevPortArray
-  result['DailySharpeRatio'] = dailySharpeRatioArray
-  result['AnnualSharpeRatio'] = annualizedSharpeRatioArray
-  return result
+  # result['AnnualSharpeRatio'] = annualizedSharpeRatioArray
+  resultEntry = pd.Series(weightDF.copy().iloc[bestIndex])
+  resultEntry['AnnualSharpeRatio'] = bestSharpeRatio
+  # print(result.iloc[bestIndex-1:bestIndex+2])
+  print(resultEntry)
+  return resultEntry
 
 def saveDataToDatabase(df, nameArray):
   dbName = ', '.join(nameArray)
@@ -218,25 +210,4 @@ def getResultFromDatabase(key):
 def getMaxAnnualSharpeRatioEntry(resultDF):
   return resultDF[resultDF['AnnualSharpeRatio']==resultDF['AnnualSharpeRatio'].max()]
 
-# obj = {'df1': btc, 'df2': dsi, 'df3': tsla}
-
-
-# newObj = mergeDates(**obj)
-# # print(newObj)
-
-# getReturnDaily(newObj[tickerList[0]])
-# getReturnDaily(newObj[tickerList[1]])
-# getReturnDaily(newObj[tickerList[2]])
-
-# weightDF = createRandomWeightDF(tickerList)
-
-# result = getStatsDF(newObj, weightDF)
-# print(result)
-# saveDataToDatabase(result,tickerList)
-# newDF = getResultFromDatabase(', '.join(tickerList))
-# print('This is newDF\n', newDF)
-# print(getMaxAnnualSharpeRatioEntry(newDF))
-
-# print(getStdevPort(newObj,[0.1,0.5,0.4]))
-# print(getReturnPort(newObj,[0.1,0.5,0.4]))
 
